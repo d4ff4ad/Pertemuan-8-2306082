@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
-import 'models/photo_model.dart';
-import 'services/photo_service.dart';
+import 'package:provider/provider.dart';
+import 'providers/photo_provider.dart';
 
 class PhotoPage extends StatefulWidget {
+  const PhotoPage({super.key});
+
   @override
   State<PhotoPage> createState() => _PhotoPageState();
 }
 
 class _PhotoPageState extends State<PhotoPage> {
-  late Future<List<PhotoModel>> futurePhotos;
-
   @override
   void initState() {
     super.initState();
-    futurePhotos = PhotoService.getPhotos();
+    Future.microtask(() {
+      if (!mounted) return;
+      Provider.of<PhotoProvider>(context, listen: false).fetchPhotos();
+    });
   }
 
   @override
@@ -24,49 +27,55 @@ class _PhotoPageState extends State<PhotoPage> {
           "Daftar Foto",
           style: TextStyle(
             color: Colors.white,
-            fontWeight: .bold,
+            fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
         backgroundColor: Colors.lightBlue,
         automaticallyImplyLeading: false,
       ),
-      body: FutureBuilder<List<PhotoModel>>(
-        future: futurePhotos,
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            final photos = snapshot.data!;
-            return ListView.builder(
-              itemCount: photos.length,
-              itemBuilder: (context, index) {
-                final photo = photos[index];
-                return Card(
-                  margin: const EdgeInsets.all(10),
-                  child: ListTile(
-                    title: Text(photo.author),
-                    subtitle: Image.network(photo.url),
-                    // leading: CircleAvatar(child: Text(photo.id.toString())),
-                  ),
-                );
-              },
-            );
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else {
+      body: Consumer<PhotoProvider>(
+        builder: (context, photoProvider, child) {
+          if (photoProvider.isLoading) {
             return Center(child: CircularProgressIndicator());
           }
+
+          if (photoProvider.errorMessage.isNotEmpty) {
+            return Center(child: Text('Error: ${photoProvider.errorMessage}'));
+          }
+
+          final photos = photoProvider.photos;
+          if (photos.isEmpty) {
+            return Center(child: Text('Tidak ada foto.'));
+          }
+
+          return ListView.builder(
+            itemCount: photos.length,
+            itemBuilder: (context, index) {
+              final photo = photos[index];
+              return Card(
+                margin: const EdgeInsets.all(10),
+                child: ListTile(
+                  title: Text(photo.author),
+                  subtitle: Image.network(photo.url),
+                ),
+              );
+            },
+          );
         },
       ),
       floatingActionButton: Row(
-        mainAxisAlignment: .spaceAround,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           FloatingActionButton(
+            heroTag: 'photo_home',
             onPressed: () {
               Navigator.pushNamed(context, '/');
             },
             child: Icon(Icons.home),
           ),
           FloatingActionButton(
+            heroTag: 'photo_photo',
             onPressed: () {
               Navigator.pushNamed(context, '/photos');
             },
